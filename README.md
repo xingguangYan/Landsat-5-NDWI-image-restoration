@@ -1,5 +1,11 @@
 # Landsat-5-NDWI-image-restoration
 # This APP mainly implements the banding problem generated in the image stitching process of Landsat 5 series images (1984-2012).The repair method mainly obtains the DN value and probability distribution of its reference image through random forest to correct the image chromatic aberration of the distribution to be repaired, so as to achieve uniform chromatic aberration of the stitched image. Concept Note: Studyarea is the study area you choose, target is the study area to be restored, reference is the study area you want to refer to for correcting the target. Please cite the article: Yan, Xingguang, Jing Li, Di Yang, Jiwei Li, Tianyue Ma, Yiting Su, Jiahao Shao, and Rui Zhang. 2022.A Random Forest Algorithm for Landsat Image Chromatic Aberration Restoration Based on GEE Cloud Platform—A Case Study of Yucatán Peninsula, MexicoRemote Sensing 14, no. 20: 5154. https://doi.org/10.3390/rs14205154
+
+// APP
+![image](https://user-images.githubusercontent.com/87305660/202715027-f4f1d7d0-185f-4e5a-b362-19397d0036bc.png)
+
+
+
 //
 // * @Name        :   landsat 5 Image Restoration
 // * @Author      :   Xingguang Yan  

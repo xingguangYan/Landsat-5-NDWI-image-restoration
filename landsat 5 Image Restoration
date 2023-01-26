@@ -1,0 +1,919 @@
+//
+// * @Name        :   landsat 5 Image Restoration
+// * @Author      :   Xingguang Yan  
+// * @University  ：  China University of Mining and Technology-Beijing
+// * @College     ：  College of Geosciences and Surveying Engineering
+// * @Email       :   xingguangyan0703@gmail.com
+//
+
+/*
+!!!!  Please cite the article:
+
+Yan, Xingguang, Jing Li, Di Yang, Jiwei Li, Tianyue Ma, Yiting Su, Jiahao Shao, and Rui Zhang. 2022.
+"A Random Forest Algorithm for Landsat Image Chromatic Aberration Restoration Based on GEE Cloud Platform—
+A Case Study of Yucatán Peninsula, Mexico"
+Remote Sensing 14, no. 20: 5154. https://doi.org/10.3390/rs14205154
+
+
+*/
+//
+
+
+////////////////////////////
+////// Set Up Styles ///////
+////////////////////////////
+
+// Fonts & Colors //
+// (pulled from Scripts/User Interface/Mosaic Editor) //
+var colors = {'transparent': '#11ffee00', 'gray': '#F8F9FA'};
+
+var TITLE_STYLE = {
+  fontWeight: '50',
+  fontSize: '24px',
+  padding: '8px',
+  color: 'red',
+  position:"top-center",
+  backgroundColor: colors.transparent,
+};
+
+var TITLE1_STYLE = {
+  fontWeight:'bold',
+  fontSize: '28px',
+  padding: '8px',
+  color: 'blue',
+  //position:"top-left",
+  backgroundColor: colors.transparent,
+};
+
+var SUBTITLE_STYLE = {
+  //fontWeight: '350',
+  fontSize: '22px',
+  padding: '8px',
+  color: '#616161',
+  textAlign: 'center',
+  fontWeight:'bold',
+  //maxWidth: '450px',
+  backgroundColor: colors.transparent,
+};
+
+var PARAGRAPH_STYLE = {
+  fontSize: '16px',
+  fontWeight: '50',
+  color: '#616161',
+  padding: '8px',
+  maxWidth: '500px',
+  backgroundColor: colors.transparent,
+};
+
+var BUTTON_STYLE = {
+  fontSize: '16px',
+  fontWeight: '100',
+  color: '#616161',
+  padding: '8px',
+  backgroundColor: colors.transparent,
+};
+
+var SELECT_STYLE = {
+  fontSize: '16px',
+  fontWeight: '50',
+  color: '#616161',
+  padding: '2px',
+  backgroundColor: colors.transparent,
+  width: '80px'
+};
+
+var LABEL_STYLE = {
+  fontWeight: '50',
+  textAlign: 'center',
+  fontSize: '14px',
+  padding: '2px',
+  backgroundColor: colors.transparent,
+};
+
+
+//////////////////////////////////////面板设定/////////////////////////////////
+//设定一个面板
+var infoPanel = ui.Panel({
+    layout: ui.Panel.Layout.flow(), 
+    style: {
+      stretch: 'horizontal',
+      height: '100%',
+      width: '400px',
+      backgroundColor: colors.gray,
+      position:"middle-left"
+    }
+});
+//设定不同的面板信息
+var seasonPanel = ui.Panel({layout: ui.Panel.Layout.flow('horizontal'), 
+                            style: {backgroundColor: colors.transparent}});
+                            
+var notePanel = ui.Panel({style: {width:"500px", position:"bottom-right"}}); 
+var visPanel = ui.Panel({style: {backgroundColor: colors.transparent}}); 
+var graphPanel = ui.Panel({style: {backgroundColor: colors.transparent}});
+var LINKPanel = ui.Panel({style: {backgroundColor: colors.transparent}});
+
+var mappanel1 = ui.Panel({
+  style: {backgroundColor: colors.transparent,
+  height: '50px',
+  width: '320px',
+  position:"bottom-center"
+  }})
+
+// 
+// var mappingPanel = ui.Map({
+//     center: {'lat': 44.5609, 'lon': -123.2697, 'zoom': 10}
+//     // style: (if you'd like to add a map style, do so here!)
+//   });
+//清除所有根部影像
+// ui.root.clear() // This is important to do to remove the "normal" GEE map
+ //ui.root.add(ui.SplitPanel(mappingPanel, infoPanel));
+
+//设定地图中心点位置
+//ui.root.clear();
+var center = /* color: #d63000 */ee.Geometry.Point([-88.91, 20.099]);
+var zoom = 7;
+Map.centerObject(center,zoom)
+//设定两个地图用来分别展示影像修复前后的结果 
+// var leftMap = ui.Map().setControlVisibility(true);
+// leftMap.centerObject(center, zoom);
+// var rightMap = ui.Map().setControlVisibility(true);
+// rightMap.centerObject(center, zoom);
+
+
+//放在leftMap出现后
+//用于链接地图geometry
+// Map.drawingTools().setLinked(true);
+// leftMap.drawingTools().setLinked(true);
+
+// ui.Map.Linker([Map, leftMap]);
+
+// leftMap.setControlVisibility({layerList:true, zoomControl:true, scaleControl:true, mapTypeControl:true, fullscreenControl:true, drawingToolsControl:true});
+// rightMap.setControlVisibility(true);
+//leftMap.setControlVisibility({zoomControl: true,drawingToolsControl:true});
+// var linker = new ui.Map.Linker([leftMap, rightMap]);
+// var splitPanel = ui.SplitPanel({
+//   firstPanel: leftMap,
+//   secondPanel: rightMap,
+//   orientation: 'horizontal',
+//   wipe: true
+// });
+
+// ui.root.add(splitPanel);
+ui.root.add(infoPanel);
+
+
+/////////////////////////分别设定两个标签来展示影像前后的结果////////////////////////////////
+// //标签面板添加信息
+// var label1= ui.Label({value:"Original RGB Image ", style:TITLE_STYLE});
+// var label2= ui.Label({value:"Matched NDVI Image ", style:TITLE_STYLE});
+// leftMap.add(label1);
+// rightMap.add(label2);
+
+//面板添加信息
+var label3 = ui.Label({value:"Landsat5 Image Restoration APP ", style:TITLE1_STYLE});
+infoPanel.add(label3);
+//添加APP描述
+var descripition =ui.Label({value:'This APP mainly implements the banding problem generated in the image stitching process of Landsat 5 series images (1984-2012).' + 
+'The repair method mainly obtains the DN value and probability distribution of its reference image through random forest to correct the image chromatic aberration of the distribution to be repaired, '+
+'so as to achieve uniform chromatic aberration of the stitched image. '+
+'Concept Note: Studyarea is the study area you choose, target is the study area to be restored, reference is the study area you want to refer to for correcting the target.'
++'           Please cite the article: Yan, Xingguang, Jing Li, Di Yang, Jiwei Li, Tianyue Ma, Yiting Su, Jiahao Shao, and Rui Zhang. 2022.'+
+"A Random Forest Algorithm for Landsat Image Chromatic Aberration Restoration Based on GEE Cloud Platform—"+
+"A Case Study of Yucatán Peninsula, Mexico"+
+"Remote Sensing 14, no. 20: 5154. https://doi.org/10.3390/rs14205154"
+  
+});
+var descripition1 =ui.Label({value:"Please read NOTE on the map before use ！！！",style:{color:'red',fontSize:'20px',fontWeight:'bold'}})
+infoPanel.add(descripition).add(descripition1);
+
+//给准备所需要的时间和波段 
+//时间面板添加到总面板上 
+infoPanel.add(seasonPanel);
+infoPanel.insert(3, ui.Label('DATE', SUBTITLE_STYLE))
+infoPanel.insert(4, ui.Label('Choose the year, month and day for the composite:'))
+//创建年份和月份的时间列表
+var year_list = [
+    {label: '1984', value: 1984},
+    {label: '1985', value: 1985},
+    {label: '1986', value: 1986},
+    {label: '1987', value: 1987},
+    {label: '1988', value: 1988},
+    {label: '1989', value: 1989},
+    {label: '1990', value: 1990},
+    {label: '1991', value: 1991},
+    {label: '1992', value: 1992},
+    {label: '1993', value: 1993},
+    {label: '1994', value: 1994},
+    {label: '1995', value: 1995},
+    {label: '1996', value: 1996},
+    {label: '1997', value: 1997},
+    {label: '1998', value: 1998},
+    {label: '1999', value: 1999},
+    {label: '2000', value: 2000},
+    {label: '2001', value: 2001},
+    {label: '2002', value: 2002},
+    {label: '2003', value: 2003},
+    {label: '2004', value: 2004},
+    {label: '2005', value: 2005},
+    {label: '2006', value: 2006},
+    {label: '2007', value: 2007},
+    {label: '2008', value: 2008},
+    {label: '2009', value: 2009},
+    {label: '2010', value: 2010},
+    {label: '2011', value: 2011},
+    {label: '2012', value: 2012}
+  ];
+
+var month_list = [
+    {label: 'January (1)', value: 1},
+    {label: 'February (2)', value: 2},
+    {label: 'March (3)',value: 3},
+    {label: 'April (4)',value:  4},
+    {label: 'May (5)',value:  5},
+    {label: 'June (6)',value:  6},
+    {label: 'July (7)',value:  7},
+    {label: 'August (8)',value:  8},
+    {label: 'September (9)',value: 9},
+    {label: 'October (10)',value: 10},
+    {label: 'November (11)',value: 11},
+    {label: 'December (12)',value: 12}
+  ];
+
+var day_list = [
+    {label: '1', value: 1},
+    {label: '2', value: 2},
+    {label: '3',value: 3},
+    {label: '4',value:  4},
+    {label: '5',value:  5},
+    {label: '6',value:  6},
+    {label: '7',value:  7},
+    {label: '8',value:  8},
+    {label: '9',value: 9},
+    {label: '10',value: 10},
+    {label: '11',value: 11},
+    {label: '12',value: 12},
+    {label: '13',value: 13},
+    {label: '14',value: 14},
+    {label: '15',value: 15},
+    {label: '16',value: 16},
+    {label: '17',value: 17},
+    {label: '18',value: 18},
+    {label: '19',value: 19},
+    {label: '20',value: 20},
+    {label: '21',value: 21},
+    {label: '22',value: 22},
+    {label: '23',value: 23},
+    {label: '24',value: 24},
+    {label: '25',value: 25},
+    {label: '26',value: 26},
+    {label: '27',value: 27},
+    {label: '28',value: 28},
+    {label: '29',value: 29},
+    {label: '30',value: 30},
+    {label: '31',value: 31}
+  ];
+
+//设定年月日三个标签
+var season_1_name = ui.Label(' Year:', LABEL_STYLE);
+var season_2_name = ui.Label(' Months:', LABEL_STYLE);
+var season_3_name = ui.Label(' Days:', LABEL_STYLE);
+
+//添加3个复选框用来选择开始和结束的时间
+var U_season_1_start = ui.Select({items: year_list, placeholder: 'Select a year', value:1994, style: SELECT_STYLE});
+var U_season_1_end = ui.Select({items: year_list, placeholder: 'Select a year', value:1994, style: SELECT_STYLE});
+
+var U_season_2_start = ui.Select({items: month_list, placeholder: 'Select a month', value:1, style: SELECT_STYLE});
+var U_season_2_end = ui.Select({items: month_list,placeholder: 'Select a month',value:12, style: SELECT_STYLE});
+
+var U_season_3_start = ui.Select({items: day_list, placeholder: 'Select a day' , value: 1, style: SELECT_STYLE});
+var U_season_3_end = ui.Select({items: day_list, placeholder: 'Select a day', value: 31, style: SELECT_STYLE});
+
+var season1 = ui.Panel({style: {backgroundColor: colors.transparent}})
+var season2 = ui.Panel({style: {backgroundColor: colors.transparent}})
+var season3 = ui.Panel({style: {backgroundColor: colors.transparent}})
+
+season1.add(season_1_name).add(U_season_1_start).add(U_season_1_end)
+season2.add(season_2_name).add(U_season_2_start).add(U_season_2_end)
+season3.add(season_3_name).add(U_season_3_start).add(U_season_3_end)
+//seasonPanel是横向排列
+seasonPanel.add(season1).add(season2).add(season3)
+
+///////////////////////////////添加可视化一个标题////////////////////////////
+infoPanel.add(visPanel)
+
+var visTitle = ui.Label('Histogram and Cumulative Distribution Function', SUBTITLE_STYLE)
+var visText = ui.Label('The Histogram and Cumulative Distribution Function appears when you have already drawn the study area, '+
+'the area to be repaired and the reference area in the drawing toolbar')
+//var visColors = ui.Panel({layout: ui.Panel.Layout.flow('horizontal'), style: {backgroundColor: colors.transparent, padding: '4px'}})
+//var GrayPanel = ui.Panel({layout: ui.Panel.Layout.flow('horizontal'), style: {backgroundColor: colors.transparent}})
+
+visPanel.add(visTitle).add(visText)
+//infoPanel.add
+
+///////////////////////////////加载这个CDF和直方图//////////////////////////
+//添加图面板到主面板上
+infoPanel.add(graphPanel)
+//添加一个button用来清除CDF和直方图
+var clearCDF = ui.Button({label:"clear Histogram and CDF"})
+
+infoPanel.add(clearCDF)
+
+clearCDF.onClick(function(){
+  graphPanel.clear()
+})
+
+// Give the user the option to choose RGB or Grayscale
+// var U_Vis_Selector = ui.Select({
+//   items: [
+//     {label: 'RGB', value: 1},
+//     {label: 'NDVI', value: 2},
+//   ],
+//   placeholder: 'RGB',
+//   value: 1, 
+//   style: SELECT_STYLE
+// })
+
+// U_Vis_Selector.onChange(function(x) {
+//   if (x == 1) {
+//     visColors.clear()
+//     visColors.add(RGBPanel)
+//   }
+//   else {
+//     visColors.clear()
+//     visColors.add(GrayPanel)
+//   }
+// })
+// visPanel.add(visTitle).add(visText).add(U_Vis_Selector)
+
+
+/////////////////////////用于加载影像下载链接的panel////////////////////////////////
+ var downimage = ui.Panel({style: {backgroundColor: colors.transparent}})
+infoPanel.add(downimage)
+
+
+
+////////////////添加基本的地图按钮 用于清除和运行初始影像////////////////////
+// Add the run & clear buttons
+// var runButton = ui.Button({label: 'Display composite', style: {width: '125px', maxWidth: '250px', color: '#616161'}});
+//var clearButton2 = ui.Button({label: 'Clear map', style: {width: '100px', maxWidth: '250px', color: '#616161',position:"bottom-left"}});
+// var clearButton = ui.Button({label: 'Clear left map', style: {width: '100px', maxWidth: '250px', color: '#616161'}});
+// var clearButton1 = ui.Button({label: 'Clear right map', style: {width: '100px', maxWidth: '250px', color: '#616161'}});
+// var clearButton3 = ui.Button({label: 'Table/SHP ID', style: {width: '100px', maxWidth: '250px', color: '#616161',position:"bottom-right"}});
+//.add(runButton).add(clearButton).add(clearButton1)
+
+var downTitle = ui.Label('Post-Restoration Image Download', SUBTITLE_STYLE)
+var downnote = ui.Label('Scale param NOTE: Get a download URL for small chunks of image data in GeoTIFF or NumPy format.' 
++'Maximum request size is 32 MB, maximum grid dimension is 1000.');
+
+
+var downtext = ui.Textbox({placeholder:"input your scale: ", value:1000,style: {width: '180px', maxWidth: '250px', color: '#616161',position:"bottom-right"}})
+var downlink = ui.Label({value:"This is the Link",style:{color:"blue"}})
+
+
+var clearLINK = ui.Button({label:"Clear Download URL"})
+downimage.add(downTitle).add(downnote).add(downtext).add(clearLINK).add(downlink);
+
+//设定清除URL LINK的按钮
+
+clearLINK.onClick(function(){
+  LINKPanel.clear()
+})
+
+infoPanel.add(LINKPanel)
+
+
+//infoPanel.add(buttonHold)
+
+downtext.onChange(function(){
+  return downtext.getValue()
+}) 
+
+//var roiAsset = ui.Textbox({placeholder:"input your Study area assets ID: ", value:"users/bqt2000204051/shanxijie",style: {width: '180px', maxWidth: '250px', color: '#616161',position:"bottom-right"}})
+//Map.add(roiAsset)
+//MAP note for everyone steps
+var note = ui.Label({value:'NOTE:1. choose your Studyarea use Rectangle 2. choose your target area use MultiPolygon\n 3. choose your reference area use Rectangle.',
+style:{color:'red',fontSize:'22px',fontWeight:'bold'}});
+notePanel.add(note)
+//mappanel1;
+//MAP上添加面板
+Map.add(notePanel)
+//Map.add(roiAsset)
+//Map.add(clearButton2)
+//Map.add(clearButton3)
+
+//点击一个左边地图上的一个点做inspector
+// leftMap.onClick(function(coords) {
+//   var point = ee.Geometry.Point(coords.lon, coords.lat)
+//   var point_layer = ui.Map.Layer(point, {}, 'POI')
+//   leftMap.setCenter(coords.lon, coords.lat)
+  
+//   var layers = leftMap.layers()
+//   var names = []
+//   layers.forEach(function(x) {
+//     var lay_name = x.getName()
+//     names.push(lay_name)
+//   })
+//   var index = names.indexOf('POI')
+//   if (index > -1) {
+//     var layer_POI = layers.get(index)
+//     leftMap.remove(layer_POI)
+//     leftMap.add(point_layer)
+//   }
+//   else {
+//     leftMap.add(point_layer)
+//   }
+// });
+
+
+//////////////////////////////////////////
+// Adding clear button onClick function //
+//////////////////////////////////////////
+// var clearMap = clearButton2.onClick(function() {
+//   var draws = drawingTools.layers()
+//     draws.forEach(function(x) {
+//     drawingTools.layers().remove(x) 
+//   })
+//   var layers = Map.layers()
+//   layers.forEach(function(x) {
+//     Map.remove(x) 
+//   })
+// });
+// var clearMap = clearButton.onClick(function() {
+//   var layers = leftMap.layers()
+//   layers.forEach(function(x) {
+//     leftMap.remove(x) 
+//   })
+// });
+// var clearMap1 = clearButton1.onClick(function() {
+//   var layers = rightMap.layers()
+//   layers.forEach(function(x) {
+//     rightMap.remove(x) 
+//   })
+// });
+//////////////////////////////必备的函数////////////////////////////////
+//NDVI
+function NDVI_l8(image) {
+  return image.addBands(
+    image.normalizedDifference(["B5", "B4"])
+         .rename("NDVI"));
+}
+function NDVI_l57(image) {
+  return image.addBands(
+    image.normalizedDifference(["B4", "B3"])
+         .rename("NDVI"));
+}
+function NDWI(image) {  
+  return image.addBands(  
+    image.normalizedDifference(["B2", "B4"])  
+         .rename("NDWI"));  
+} 
+
+//Landsat5/7/8 SR数据去云  
+function fmask(image) {  
+  var cloudShadowBitMask = (1 << 3);  
+  var cloudsBitMask = (1 << 5);  
+  var qa = image.select("pixel_qa");  
+  var mask = qa.bitwiseAnd(cloudShadowBitMask).eq(0)  
+                 .and(qa.bitwiseAnd(cloudsBitMask).eq(0));  
+  return image.updateMask(mask);  
+} 
+
+function addndvi1(image) {
+              var ndvi = image.normalizedDifference(['B4', 'B3']);
+  return image.addBands(ndvi.rename('NDVI'));
+}
+
+//var landsat = ee.ImageCollection('LANDSAT/LT05/C01/T1_SR')
+
+//先选择研究区
+//将影像要修复区域进行分析，首先选择参考影像，再选择待修复影像
+//参考影像用矩形选取，目标影像用多边形选取
+//
+// var reference_p = reference;
+// var target_p = target;
+
+//var Studyarea= ee.FeatureCollection(roiAsset.getValue());
+//TEXTBOX无法获取输入值
+
+// var clearMap1 = clearButton3.onClick(function() {
+//   var studyarea= ee.FeatureCollection(roiAsset.getValue());
+//   print(studyarea)
+//   });
+
+
+
+
+ var drawingTools = Map.drawingTools();
+
+ drawingTools.setLinked(false)
+Map.setOptions('HYBRID')
+
+Map.drawingTools().setDrawModes(['point',"rectangle","polygon"])
+//设定3个geometry
+var tuceng=Map.drawingTools().addLayer({geometries:[],name:"Studyarea",color:"white"})
+var tuceng1=Map.drawingTools().addLayer({geometries:[],name:"target",color:"red"})
+var tuceng2=Map.drawingTools().addLayer({geometries:[],name:"reference",color:"blue"})
+//设定3个默认的geometry为 
+Map.drawingTools().setShape('rectangle')
+//设定开始编辑画的模式
+Map.drawingTools().draw();
+
+//NDWI可视化参数
+var palettes = require('users/gena/packages:palettes');
+var palette = palettes.colorbrewer.YlGnBu[7];
+
+  //NDVI可视化参数
+// var ndvivisParam = {
+// min: -0.1,
+// max: 0.9,
+// palette: 'FFFFFF, CE7E45, DF923D, F1B555, FCD163, 99B718, 74A901, 66A000, 529400,' +
+//   '3E8601, 207401, 056201, 004C00, 023B01, 012E01, 011D01, 011301'
+// };
+ var ndvivisParam = {min: -1, max: 1, palette:palettes.colorbrewer.YlGnBu[7]}
+
+//预先加载三个图层，然后等操作完成后将图层放入进去 
+//改正这一块layer
+var roiLayer = ui.Map.Layer(ee.Image(), { band:['B3', 'B2', 'B1'],min: 0, max: 3500 }, 'Studyarea_RGB')
+var roindvi = ui.Map.Layer(ee.Image(), ndvivisParam, 'Before NDVI restoratione')
+var afterLayer = ui.Map.Layer(ee.Image(), ndvivisParam, 'After NDVI restoration')
+// var roindvi=ee.Image()
+// leftMap.addLayer(roindvi, ndvivisParam,"ndvi_before")
+
+// var targetLayer = ui.Map.Layer(ee.Image(), { band:"NDVI", min: -0.1,
+// max: 0.9,
+// palette: 'FFFFFF, CE7E45, DF923D, F1B555, FCD163, 99B718, 74A901, 66A000, 529400,' +
+//   '3E8601, 207401, 056201, 004C00, 023B01, 012E01, 011D01, 011301'
+// }, 'target')
+// var afterLayer = ee.Image()
+
+// rightMap.addLayer(afterLayer, ndvivisParam, 'matched_ndvi')
+
+Map.layers().add(roiLayer).add(roindvi).add(afterLayer)
+// leftMap.add(roindvi)
+// rightMap.add(afterLayer)
+////////////////////////////////////////////////////////////
+// Adding run button onClick function: building composite //
+////////////////////////////////////////////////////////////
+
+//var buildComposite = runButton.onClick(function() {
+
+  
+
+// print(start)
+// print(end)
+  //var vis_value = U_Vis_Selector.getValue()
+  
+  
+  var queryLastS2Image = function() {
+    
+    
+  
+
+  if(Map.drawingTools().layers().get(0).geometries().length() > 1) {
+
+    // delete previously drawn points first
+    Map.drawingTools().layers().get(0).geometries().remove(Map.drawingTools().layers().get(0).geometries().get(0))
+  }
+    if(Map.drawingTools().layers().get(1).geometries().length() > 1) {
+
+    // delete previously drawn points first
+    Map.drawingTools().layers().get(1).geometries().remove(Map.drawingTools().layers().get(1).geometries().get(0))
+  }
+      if(Map.drawingTools().layers().get(2).geometries().length() > 1) {
+
+    // delete previously drawn points first
+    Map.drawingTools().layers().get(2).geometries().remove(Map.drawingTools().layers().get(2).geometries().get(0))
+  }
+  
+  var Studyarea = Map.drawingTools().layers().get(0).toGeometry();
+  var target_p = Map.drawingTools().layers().get(1).toGeometry();
+  var reference_p = Map.drawingTools().layers().get(2).toGeometry();
+  
+  
+  var s1s = U_season_1_start.getValue()
+  var s2s = U_season_2_start.getValue()
+  var s3s = U_season_3_start.getValue()
+
+  var s1e = U_season_1_end.getValue()
+  var s2e = U_season_2_end.getValue()
+  var s3e = U_season_3_end.getValue()
+  
+
+var start = s1s+"-"+s2s+""+s3s
+var end = s1e+"-"+s2e+"-"+s3e
+  
+ // filter(ee.Filter.calendarRange(s1s, s1e, 'year')).filter(ee.Filter.calendarRange(s2s, s2e, 'month')).filter(ee.Filter.calendarRange(s3s, s3e, 'day'))
+  var imagecol = ee.ImageCollection('LANDSAT/LT05/C01/T1_SR').filterBounds(Studyarea).filterDate(start,end).map(fmask).map(NDWI)//.median();
+  // var season_2 = L8_processed.filter(ee.Filter.calendarRange(s2s, s2e, 'month')).median().select('ndvi').rename('ndvi_s2');
+  // var season_3 = L8_processed.filter(ee.Filter.calendarRange(s3s, s3e, 'month')).median().select('ndvi').rename('ndvi_s3');
+
+//print(imagecol)
+
+
+// Image quality mosaic and study area clip
+var ndvi_before = imagecol.qualityMosaic('NDWI').clip(Studyarea);
+//print("ndvi_before", ndvi_before);
+roiLayer.setEeObject(imagecol.mosaic().clip(Studyarea))
+roindvi.setEeObject(ndvi_before.select("NDWI").clip(Studyarea))
+// Define the new bands name
+var bandNames = ['blue', 'green', 'red','nir','ndwi'];
+
+// Reference image 
+var reference =  ndvi_before .select(['B1','B2','B3','B4','NDWI']).rename(bandNames).clip(reference_p);
+//Map.addLayer(reference, {bands:['red','green','blue'],min:0, max:3000}, 'Reference Image');
+
+// Original Target image
+var target =  ndvi_before.select(['B1','B2','B3','B4','NDWI']).rename(bandNames).clip(target_p);
+//Map.addLayer(target, {bands:['red','green','blue'],min:0, max:3000}, 'Target Image');
+
+// Histogram function
+function showHistogram (image, name, band) {
+  var options = {
+	title: 'Histogram of ' + name,
+	fontSize: 16,
+	hAxis: {title: 'DN value'},
+	vAxis: {title: 'count of DN'},
+	series: {0: {color: 'blue'},
+  }};
+    
+  var histogram = ui.Chart.image.histogram({
+	image: image.select(band),
+	region: image.geometry(),
+	maxBuckets: Math.pow(2, 8),
+	scale: 100,
+	maxPixels: 1e9
+  });
+  
+  var histogram1 = histogram.setSeriesNames([band]).setOptions(options);
+  //print(histogram1);
+  graphPanel.add(histogram1)
+}
+// Show Reference and Target histograms
+// showHistogram(reference, 'Reference Image', 'ndvi');
+// showHistogram(target, 'Target Image', 'ndvi');
+
+// Cumulative distribution function
+// Define the function to generate the set of elements of [DN value, probability] for the specified band
+function getHistData (image, band) {
+  var histogram = image.reduceRegion({
+    reducer: ee.Reducer.histogram({
+      maxBuckets: Math.pow(2, 9), 
+    }), 
+    geometry: image.geometry(), 
+    scale: 100, 
+    maxPixels: 1e13, 
+  });
+
+  var dnList = ee.List(ee.Dictionary(histogram.get(band)).get('bucketMeans'));
+  var countsList = ee.List(ee.Dictionary(histogram.get(band)).get('histogram'));
+  var cumulativeCountsArray = ee.Array(countsList).accum({axis:0});
+  var totalCount = cumulativeCountsArray.get([-1]);
+  var cumulativeProbabilities = cumulativeCountsArray.divide(totalCount);
+  var array = ee.Array.cat({arrays: [dnList, cumulativeProbabilities], axis:1});
+  
+  var fc = ee.FeatureCollection(array.toList().map(function(list) {
+    return ee.Feature(null, {
+      dn: ee.List(list).get(0), 
+      probability: ee.List(list).get(1)});
+  }));
+  return fc;
+}
+
+// Cumulative Distribution chart
+function showCdf (image, name, band) {
+	var cdf = getHistData(image, band);
+  
+	var options = {
+		title: 'Cumulative Distribution Function of ' + name ,
+		fontSize: 16,
+		hAxis: {title: 'DN'},
+		vAxis: {title: 'Cumulative Probability'},
+		series: {
+			0: {color: 'red'},
+		}
+	}; 
+  
+	var cdfChart = ui.Chart.feature.byFeature({
+		features: cdf,
+		xProperty: 'dn',
+		yProperties: ['probability']
+			}).setOptions(options);
+	graphPanel.add(cdfChart)
+	//print(cdfChart);
+}
+// showCdf(reference, 'Reference Image', 'ndvi');
+// showCdf(target, 'Target Image', 'ndvi');
+
+
+// Histogram mapping function
+function equalize (referenceImage, targetImage, band) {
+	var referenceHistData = getHistData(referenceImage, band);
+	var targetHistData = getHistData(targetImage, band);
+  
+  //Random Forest Algorithm
+  var probToDn = ee.Classifier.smileRandomForest(100)
+    .setOutputMode('REGRESSION')
+    .train({
+      features: referenceHistData, 
+      classProperty: 'dn', 
+      inputProperties: ['probability']
+  });
+	var dnToProb = ee.Classifier.smileRandomForest(100)
+      .setOutputMode('REGRESSION')
+      .train({
+        features: targetHistData, 
+        classProperty: 'probability', 
+        inputProperties: ['dn']
+    });
+    var targetImageProb = targetImage.select(band).rename('dn').classify(dnToProb, 'probability');
+    var targetImageDn = targetImageProb.classify(probToDn, band);
+    return targetImageDn;
+}
+
+//Image Matching Function 
+var match = function(referenceImage, targetImage, bandNames) {
+	var matchedBands = bandNames.map(function(band)
+	{
+		return equalize(referenceImage, targetImage, band);
+  });
+	return ee.Image.cat(matchedBands);
+};
+var matched = match(reference, target, bandNames);
+
+// Matched Histogram and Cumulative Distribution chart
+// showHistogram(matched, 'Matched Image', 'ndvi');
+// showCdf(matched, 'Matched Image', 'ndvi');
+
+//print(matched)
+var matched1 = matched.select("ndwi").rename("NDWI").toDouble();
+var imgAB1 = ee.ImageCollection.fromImages([ndvi_before.select("NDWI").toFloat(), matched1.select("NDWI").toFloat()]);
+var result_ndvi = imgAB1.mosaic();
+
+//方法2：分别对匹配后的NIR和RED进行再次ndvi计算
+// Matched image ndvi values for the study area
+
+//这里的关键就是求出匹配后的ndvi值的计算。这里就相当于是分别计算了两个波段匹配后的效果的ndvi
+// var Matched_target_ndvi = matched.normalizedDifference(['nir', 'red']).rename("NDVI").clip(Studyarea);
+// //print("Matched_target_ndvi",Matched_target_ndvi)
+
+
+// // matched Image mosaic
+// var imgAB = ee.ImageCollection.fromImages([ndvi_before.select("NDVI"), Matched_target_ndvi.select("NDVI")]);
+// var result_ndvi = imgAB.mosaic();
+//print("result_ndvi",result_ndvi);
+// // ndvi mean/rmse/mae/mse/stdDev and statistics 
+// // Matched image ndvi value for the study area2
+// var ndvivalue_3 = result_ndvi.reduceRegion({
+//     reducer: ee.Reducer.mean().combine(ee.Reducer.stdDev(),null, true),
+//     geometry: Studyarea,
+//     scale: 100,
+//     maxPixels: 1e13
+//   });
+// print("2Matched image ndvi value for the study area", ndvivalue_3);
+
+// var result_ndviarrayImage = result_ndvi.toArray().arrayFlatten([['NDVI']]);
+// print("result_ndvitarrayImage",result_ndviarrayImage);
+
+// // Matched Target image ndvi value2 
+// var Matched_Target_ndvi = Matched_target_ndvi.reduceRegion({
+//     reducer: ee.Reducer.mean().combine(ee.Reducer.stdDev(),null, true),
+//     geometry: target_p,
+//     scale: 1000,
+//     maxPixels: 1e13
+//   });
+// print("2Matched Target image ndvi value", Matched_Target_ndvi);
+
+// var Matched_Target_ndviarrayImage = Matched_Target_ndvi.toArray();//.arrayFlatten()
+// print("Matched_Target_ndvitarrayImage",Matched_Target_ndviarrayImage);
+
+
+//加载修复后影像的ndvi
+afterLayer.setEeObject(result_ndvi.select("NDWI"))
+
+var imageurl = ui.Label({value:result_ndvi.select("NDWI").clip(Studyarea).getDownloadURL({scale:downtext.getValue()})});
+
+LINKPanel.add(imageurl)
+
+//当我们改变文本框信息的时候加载新的scale的影像链接
+downtext.onChange(function(){
+var scale1 = downtext.getValue()
+  var image=result_ndvi.select("NDWI").clip(Studyarea).getDownloadURL({scale:scale1})
+  imageurl.setValue(image)
+   return imageurl;
+   }) 
+
+
+    
+if (Map.drawingTools().layers().length()>2) {
+//添加直方图和累积分布函数曲线
+var show=ui.Button({label:"show Histogram and CDF"})
+graphPanel.add(show)
+
+show.onClick(function(){
+  // Show Reference and Target histograms
+showHistogram(reference, 'Reference Image', 'ndwi');
+showHistogram(target, 'Target Image', 'ndwi');
+
+showCdf(reference, 'Reference Image', 'ndwi');
+showCdf(target, 'Target Image', 'ndwi');
+
+// Matched Histogram and Cumulative Distribution chart
+showHistogram(matched, 'Matched Image', 'ndwi');
+showCdf(matched, 'Matched Image', 'ndwi');
+})
+
+}
+else{
+  graphPanel.clear()
+  
+}
+//infoPanel.insert(7,show)
+
+//添加影像下载链接
+
+    
+}
+
+
+
+
+
+
+// //将原始的图层NDVI和RGB影像加载
+// if (vis_value == 1) {
+//     var comp = Map.addLayer(imagecol.median().clip(Studyarea), vis, 'RGB');
+//     var comp1 = leftMap.addLayer(imagecol.select("NDVI").median().clip(Studyarea), ndvivisParam, "NDVI");
+//     Map.add(comp);
+//     leftMap.add(comp1);
+
+    
+//     }
+//   else {
+
+//     var imageurl = ui.Label({value:result_ndvi.getDownloadURL({scale:downtext.getValue()})});
+//     infoPanel.add(imageurl);
+//     var comp2 = rightMap.addLayer(result_ndvi.select("NDVI"), ndvivisParam, "NDVI");
+//     rightMap.add(comp2)//.add(imageurl);
+//     // var imageurl = ui.Label({value:result_ndvi.getDownloadURL()});
+
+//   }
+
+
+
+
+
+Map.drawingTools().onDraw(queryLastS2Image);
+  
+
+
+
+// Map.drawingTools().onErase(function() {
+// var tiaojian= Map.drawingTools().layers().get(0).geometries().length();
+//   if(tiaojian == 0) {
+//     // inspector.clear()
+//     // var label = new ui.Label('Draw a point to query the lastest optical image')
+//     // inspector.add(label)
+//     imageLayer.setEeObject(ee.Image())
+//     return
+//   }
+// })
+  //});
+
+
+
+
+
+// var ui.Button()
+// Export.image.toDrive({
+//   image:result_ndvi.select("NDVI"),
+//   description: '1994_shanxi_NDVI_Matched2_images_SR',
+//   folder: 'shanxi_test',
+//   scale: 1000,
+//   region:Studyarea
+// });
+
+
+
+
+
+
+
+////////////////////////////////影像展示///////////////////////////////
+//RGB
+
+
+// var landsat = ee.ImageCollection('LANDSAT/LT05/C01/T1_SR')
+//                 .filterDate('2000-01-01', '2001-01-01')
+//                 .median();
+// landsat = landsat.addBands(landsat.normalizedDifference(['B4', 'B3']).rename("NDVI"));
+// var vis = {bands: ['B4', 'B3', 'B2'], min: 0, max: 3000};
+// leftMap.addLayer(landsat, vis, "rgb");
+
+// //NDVI
+// var visNDVI = {
+//   min: 0,
+//   max: 1,
+//   palette: 'FFFFFF,CE7E45,DF923D,F1B555,FCD163,99B718,74A901,66A000,529400,' +
+//       '3E8601,207401,056201,004C00,023B01,012E01,011D01,011301'
+// };
+// rightMap.addLayer(landsat.select("NDVI"), visNDVI, 'NDVI');
